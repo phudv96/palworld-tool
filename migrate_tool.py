@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # =====================================================================
-#  Palworld UID Migration Tool (tuong tac)
-#  - Nhap duong dan world -> hien toan bo member
-#  - Chon chieu migrate (LOCAL<->DEDICATED)
-#  - Chon member -> patch an toan (length-preserving, ho tro Oodle/PlM)
+#  Palworld UID Migration Tool (interactive)
+#  - Enter world path -> show all members
+#  - Choose migration direction (LOCAL<->DEDICATED)
+#  - Choose member -> safe patch (length-preserving, supports Oodle/PlM)
 #
-#  Chay:  python D:\Tool\migrate_tool.py  [world_dir]
+#  Run:  python D:\Tool\migrate_tool.py  [world_dir]
 # =====================================================================
 import os, sys, struct, io, contextlib
 
-# Nap package Oodle-capable (chay duoc tu bat ky cwd nao)
+# Load the Oodle-capable package (runnable from any cwd)
 sys.path.insert(0, r"d:\Tool\palworld-host-save-fix-main")
 from palworld_save_tools.gvas import GvasFile
 from palworld_save_tools.palsav import decompress_sav_to_gvas, compress_gvas_to_sav
 from palworld_save_tools.paltypes import PALWORLD_CUSTOM_PROPERTIES, PALWORLD_TYPE_HINTS
 
-HOST = "00000000000000000000000000000001"   # UID host tren listen/local server
+HOST = "00000000000000000000000000000001"   # host UID on listen/local server
 
 _DIS = ("MapObject","Foliage","CharacterSaveParameterMap.Value.RawData","ItemContainerSaveData",
         "CharacterContainerSaveData","DynamicItemSaveData","BaseCampSaveData","WorkSaveData","GroupSaveDataMap")
@@ -75,7 +75,7 @@ def find_players(blob, require=None):
     cands.sort(key=lambda x:(-x[1],x[0]))
     return cands[0] if cands else None
 
-# ---------- doc member ----------
+# ---------- read members ----------
 def list_members(level_path):
     raw,st = decompress_sav_to_gvas(open(level_path,"rb").read())
     lj = load_gvas(raw)
@@ -98,14 +98,14 @@ def do_migrate(world, old_uid, new_uid, out_dir=None):
     src_p=os.path.join(world,"Players",old_uid.upper()+".sav")
     level =os.path.join(world,"Level.sav")
     if not os.path.exists(src_p):
-        print(f"  ERROR: khong tim thay player save nguon: {src_p}"); return False
+        print(f"  ERROR: source player save not found: {src_p}"); return False
 
     # source player
     praw,pst=decompress_sav_to_gvas(open(src_p,"rb").read()); praw=bytearray(praw)
     pj=load_gvas(bytes(praw)); sd=pj["properties"]["SaveData"]["value"]
     IID=uraw(sd["IndividualId"]["value"]["InstanceId"]["value"])
     if uraw(sd["PlayerUId"]["value"])!=OLD:
-        print("  ERROR: PlayerUId trong file nguon khong khop OLD uid"); return False
+        print("  ERROR: PlayerUId in source file does not match OLD uid"); return False
 
     p_slots=[]; s=0
     while True:
@@ -153,15 +153,15 @@ def do_migrate(world, old_uid, new_uid, out_dir=None):
         if off in seen: continue
         seen.add(off); uniq.append((tg,off))
 
-    print(f"\n  [Level.sav] slot se patch:")
+    print(f"\n  [Level.sav] slots to patch:")
     for tg,off in sorted(uniq,key=lambda x:x[1]):
         cur=lraw[off:off+16]
         print(f"     0x{off:06x}  {tg:<32} current={'OLD' if cur==OLD else cur.hex()}")
         if cur!=OLD:
-            print(f"  ERROR: slot {tg} khong phai OLD uid -> huy"); return False
-    print(f"  [player .sav] slot: {[hex(x) for x in p_slots]} (mong doi 2)")
+            print(f"  ERROR: slot {tg} is not OLD uid -> abort"); return False
+    print(f"  [player .sav] slots: {[hex(x) for x in p_slots]} (expect 2)")
     if bytes(lraw).count(NEW)>0 and new_uid!=HOST:
-        print(f"  CANH BAO: UID dich {new_uid[:8]} da ton tai trong Level.sav -> char/guild cu se bi orphan")
+        print(f"  WARNING: target UID {new_uid[:8]} already exists in Level.sav -> old char/guild will be orphaned")
 
     # apply
     for h in p_slots: praw[h:h+16]=NEW
@@ -173,16 +173,16 @@ def do_migrate(world, old_uid, new_uid, out_dir=None):
     psav=compress_gvas_to_sav(bytes(praw),pst)
     p2,_=decompress_sav_to_gvas(psav); assert bytes(p2)==bytes(praw), "Player round-trip mismatch"
     load_gvas(bytes(lraw)); load_gvas(bytes(praw))
-    print(f"  Verify OK: Level {len(uniq)} slot, Player {len(p_slots)} slot; round-trip + reparse thanh cong.")
-    print(f"  Pal handle giu nguyen UID cu: con {bytes(lraw).count(OLD)} (co y)")
+    print(f"  Verify OK: Level {len(uniq)} slots, Player {len(p_slots)} slots; round-trip + reparse succeeded.")
+    print(f"  Pal handles keep the old UID: {bytes(lraw).count(OLD)} remaining (intentional)")
 
     if out_dir:
         os.makedirs(os.path.join(out_dir,"Players"),exist_ok=True)
         with open(os.path.join(out_dir,"Level.sav"),"wb") as f: f.write(lsav)
         with open(os.path.join(out_dir,"Players",new_uid.upper()+".sav"),"wb") as f: f.write(psav)
-        print(f"\n  >>> DA GHI: {out_dir}\\Level.sav  va  Players\\{new_uid.upper()}.sav")
+        print(f"\n  >>> WROTE: {out_dir}\\Level.sav  and  Players\\{new_uid.upper()}.sav")
     else:
-        print("\n  (DRY-RUN — chua ghi file nao)")
+        print("\n  (DRY-RUN - no files written)")
     return True
 
 # ---------- UI ----------
@@ -198,51 +198,51 @@ def main():
     print("="*60)
     print("   PALWORLD UID MIGRATION TOOL")
     print("="*60)
-    world = sys.argv[1] if len(sys.argv)>1 else ask("Nhap duong dan world (folder chua Level.sav): ")
+    world = sys.argv[1] if len(sys.argv)>1 else ask("Enter world path (folder containing Level.sav): ")
     world = world.strip('"').strip()
     level = os.path.join(world,"Level.sav")
     if not os.path.exists(level):
-        print(f"ERROR: khong thay Level.sav tai: {level}"); sys.exit(1)
+        print(f"ERROR: Level.sav not found at: {level}"); sys.exit(1)
 
-    print("\nDang doc save...")
+    print("\nReading save...")
     members, dl, st = list_members(level)
-    print(f"Level.sav OK (giai nen {dl} bytes, save_type {hex(st)})\n")
+    print(f"Level.sav OK (decompressed {dl} bytes, save_type {hex(st)})\n")
     if not members:
-        print("Khong tim thay member nao trong guild."); sys.exit(1)
+        print("No members found in any guild."); sys.exit(1)
 
-    print("=== THANH VIEN ===")
+    print("=== MEMBERS ===")
     for i,(u,nm,gi,adm) in enumerate(members,1):
         host_tag = "  <-- HOST(000..001)" if uid32(u)==HOST else ""
         print(f"  [{i}] {nm:<16} UID {uid32(u).upper()}  (guild #{gi}{', admin' if adm else ''}){host_tag}")
     host_present = any(uid32(u)==HOST for u,_,_,_ in members)
 
-    print("\n=== CHIEU MIGRATE ===")
-    print("  [1] LOCAL -> DEDICATED   (host 000...001  ->  UID dedicated)")
-    print("  [2] DEDICATED -> LOCAL   (UID dedicated   ->  host 000...001)")
-    d = ask("Chon chieu (1/2): ")
+    print("\n=== MIGRATION DIRECTION ===")
+    print("  [1] LOCAL -> DEDICATED   (host 000...001  ->  dedicated UID)")
+    print("  [2] DEDICATED -> LOCAL   (dedicated UID   ->  host 000...001)")
+    d = ask("Choose direction (1/2): ")
 
     if d=="1":
         if not host_present:
-            print("CANH BAO: khong thay member host 000...001 trong save nay (van tiep tuc neu Players\\000...001.sav ton tai).")
+            print("WARNING: host member 000...001 not found in this save (continuing anyway if Players\\000...001.sav exists).")
         old_uid = HOST
-        raw = ask("Nhap UID DEDICATED dich (32 ky tu hex): ")
+        raw = ask("Enter target DEDICATED UID (32 hex chars): ")
         new_uid = norm_uid(raw)
-        if not new_uid: print("UID khong hop le (can 32 ky tu hex)."); sys.exit(1)
+        if not new_uid: print("Invalid UID (need 32 hex chars)."); sys.exit(1)
     elif d=="2":
-        sel = ask("Chon so thu tu member can migrate: ")
+        sel = ask("Enter the number of the member to migrate: ")
         try:
             idx=int(sel)-1; u=members[idx][0]
-        except: print("Lua chon khong hop le."); sys.exit(1)
+        except: print("Invalid choice."); sys.exit(1)
         old_uid = uid32(u)
         if old_uid==HOST:
-            print("Member nay da la host 000...001 roi."); sys.exit(1)
+            print("This member is already host 000...001."); sys.exit(1)
         new_uid = HOST
     else:
-        print("Chieu khong hop le."); sys.exit(1)
+        print("Invalid direction."); sys.exit(1)
 
-    print(f"\n  OLD (nguon):  {old_uid.upper()}")
-    print(f"  NEW (dich):   {new_uid.upper()}")
-    out = ask("\nNhap folder xuat (Enter = chi DRY-RUN, khong ghi): ")
+    print(f"\n  OLD (source):  {old_uid.upper()}")
+    print(f"  NEW (target):  {new_uid.upper()}")
+    out = ask("\nEnter output folder (Enter = DRY-RUN only, no writes): ")
     out = out.strip('"').strip() or None
     if out and not os.path.isabs(out):
         out = os.path.join("d:\\Tool", out)
@@ -251,10 +251,10 @@ def main():
     ok = do_migrate(world, old_uid, new_uid, out)
     print("-"*60)
     if ok and out:
-        print(f"\nHOAN TAT. Copy Level.sav + Players\\{new_uid.upper()}.sav tu '{out}' vao world dich,")
-        print(f"xoa file Players\\{old_uid.upper()}.sav cu.")
+        print(f"\nDONE. Copy Level.sav + Players\\{new_uid.upper()}.sav from '{out}' into the target world,")
+        print(f"and delete the old Players\\{old_uid.upper()}.sav file.")
         if new_uid!=HOST:
-            print("Neu deploy len DEDICATED: nho XOA WorldOption.sav trong world dich (tranh loi REST AdminPassword).")
+            print("If deploying to DEDICATED: remember to DELETE WorldOption.sav in the target world (avoids REST AdminPassword error).")
 
 if __name__=="__main__":
     main()

@@ -6,13 +6,13 @@ MAGIC_BYTES_PLZ = b"PlZ"
 MAGIC_BYTES_PLM = b"PlM"
 
 def decompress_oodle(compressed_data: bytes, uncompressed_size: int) -> bytes:
-    # Tìm file DLL ở thư mục hiện tại hoặc thư mục cha
+    # Look for the DLL in the current directory or the parent directory
     dll_path = os.path.abspath("oo2core_9_win64.dll")
     if not os.path.exists(dll_path):
         dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "oo2core_9_win64.dll"))
-    
+
     if not os.path.exists(dll_path):
-        raise FileNotFoundError("Khong tim thấy file oo2core_9_win64.dll!")
+        raise FileNotFoundError("oo2core_9_win64.dll not found!")
 
     oodle = ctypes.cdll.LoadLibrary(dll_path)
     out_buf = ctypes.create_string_buffer(uncompressed_size)
@@ -22,7 +22,7 @@ def decompress_oodle(compressed_data: bytes, uncompressed_size: int) -> bytes:
         0, 0, 0, None, None, None, None, None, None, 0
     )
     if result <= 0:
-        raise Exception(f"Giai ma Oodle that bai voi ma loi: {result}")
+        raise Exception(f"Oodle decompression failed with error code: {result}")
     return out_buf.raw
 
 def decompress_sav_to_gvas(data: bytes) -> tuple[bytes, int]:
@@ -39,7 +39,7 @@ def decompress_sav_to_gvas(data: bytes) -> tuple[bytes, int]:
     elif magic_bytes == MAGIC_BYTES_PLM:
         return decompress_oodle(data[12:], uncompressed_len), save_type
     else:
-        raise Exception(f"Khong ho tro dinh dang save: {magic_bytes!r}")
+        raise Exception(f"Unsupported save format: {magic_bytes!r}")
 
 def compress_gvas_to_sav(data: bytes, save_type: int) -> bytes:
     if save_type == 0:

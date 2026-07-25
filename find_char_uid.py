@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-# Liet ke moi nhan vat (UID -> ten) trong Level.sav cua Palworld, ho tro save Oodle (PlM).
+# List every character (UID -> name) in a Palworld Level.sav, supports Oodle saves (PlM).
 # Usage:
-#   python D:\Tool\find_char_uid.py <world_dir_hoac_Level.sav> [ten_nhan_vat]
-# Vi du:
-#   python D:\Tool\find_char_uid.py "D:\Tool\SaveGames\...\<world>"            # liet ke tat ca
-#   python D:\Tool\find_char_uid.py "D:\Tool\SaveGames\...\<world>" Puddy      # tim rieng 'Puddy'
+#   python D:\Tool\find_char_uid.py <world_dir_or_Level.sav> [character_name]
+# Examples:
+#   python D:\Tool\find_char_uid.py "D:\Tool\SaveGames\...\<world>"            # list all
+#   python D:\Tool\find_char_uid.py "D:\Tool\SaveGames\...\<world>" Puddy      # search only for 'Puddy'
 import sys, os, struct, io, contextlib
 
-# Nap package Oodle-capable trong palworld-host-save-fix-main (chay duoc tu bat ky cwd nao)
+# Load the Oodle-capable package in palworld-host-save-fix-main (runnable from any cwd)
 sys.path.insert(0, r"d:\Tool\palworld-host-save-fix-main")
 from palworld_save_tools.gvas import GvasFile
 from palworld_save_tools.palsav import decompress_sav_to_gvas
@@ -52,16 +52,16 @@ def find_players(blob):
     return cands[0] if cands else None
 
 def uid32(u):
-    # dang ten file .sav (4 byte dau dao nguoc + zeros)
+    # .sav filename form (first 4 bytes reversed + zeros)
     return "".join(f"{b:02x}" for b in u[:4][::-1]) + "0"*24
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: python find_char_uid.py <world_dir_hoac_Level.sav> [ten_nhan_vat]"); sys.exit(1)
+        print("usage: python find_char_uid.py <world_dir_or_Level.sav> [character_name]"); sys.exit(1)
     p = sys.argv[1]
     level = os.path.join(p, "Level.sav") if os.path.isdir(p) else p
     if not os.path.exists(level):
-        print(f"ERROR: khong tim thay Level.sav tai: {level}"); sys.exit(1)
+        print(f"ERROR: Level.sav not found at: {level}"); sys.exit(1)
     target = sys.argv[2].lower() if len(sys.argv) > 2 else None
 
     raw,st = decompress_sav_to_gvas(open(level,"rb").read())
@@ -69,7 +69,7 @@ def main():
     lj = load_gvas(raw)
     groups = lj["properties"]["worldSaveData"]["value"]["GroupSaveDataMap"]["value"]
 
-    print("=== Guilds (UID -> ten nhan vat) ===")
+    print("=== Guilds (UID -> character name) ===")
     name_to_uid = {}
     for gi,g in enumerate(groups):
         if g["value"]["GroupType"]["value"]["value"] != "EPalGroupType::Guild": continue
@@ -88,7 +88,7 @@ def main():
             nm,fn = name_to_uid[target]
             print(f">>> MATCH: '{nm}' -> UID = {fn.upper()}")
         else:
-            print(f">>> '{sys.argv[2]}' khong thay. Cac ten co: {[v[0] for v in name_to_uid.values()]}")
+            print(f">>> '{sys.argv[2]}' not found. Available names: {[v[0] for v in name_to_uid.values()]}")
 
 if __name__ == "__main__":
     main()

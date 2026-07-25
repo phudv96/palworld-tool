@@ -8,9 +8,9 @@ from palworld_save_tools.gvas import GvasFile
 from palworld_save_tools.palsav import compress_gvas_to_sav, decompress_sav_to_gvas
 from palworld_save_tools.paltypes import PALWORLD_CUSTOM_PROPERTIES, PALWORLD_TYPE_HINTS
 
-# Lọc bỏ các property hay lỗi decode với bản game mới (byte thừa -> "EOF not reached").
-# Script chỉ cần sửa PlayerUId ở KEY của CharacterSaveParameterMap, không cần đọc raw data,
-# nên để nguyên các phần này dưới dạng byte và ghi lại y hệt là an toàn.
+# Skip properties that often fail to decode on newer game versions (extra bytes -> "EOF not reached").
+# This script only needs to edit the PlayerUId in the KEY of CharacterSaveParameterMap; it does not
+# need the raw data, so leaving these parts as opaque bytes and writing them back verbatim is safe.
 _DISABLED = (
     "MapObject",
     "Foliage",

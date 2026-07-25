@@ -1,10 +1,10 @@
-# Save data cá nhân (nặng, binary) — không version-control
+# Personal save data (large, binary) - not version controlled
 SaveGames/
 
-# Memory / dữ liệu cá nhân của Claude Code
+# Claude Code memory / personal data
 .claude/
 
-# Output migrate (sinh ra khi chạy tool)
+# Migration output (generated when running the tools)
 PATCHED_*/
 
 # Python cache
