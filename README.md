@@ -22,6 +22,7 @@ one-shot provisioning, automated Telegram backups, and fixes for the common post
 9. [Repository layout](#9-repository-layout)
 10. [Requirements & setup](#10-requirements--setup)
 11. [Safety, limitations & credits](#11-safety-limitations--credits)
+12. [Acknowledgements](#12-acknowledgements)
 
 ---
 
@@ -372,4 +373,26 @@ Not tracked (see `.gitignore`): `SaveGames/` (personal save data), migration out
 - Save-format internals build on **[cheahjs/palworld-save-tools](https://github.com/cheahjs/palworld-save-tools)**.
   `oo2core_9_win64.dll` is Oodle, © RAD Game Tools / Epic Games, included only to decode saves locally.
 - Provided as-is for personal use with your own saves. Not affiliated with Pocketpair.
+
+---
+
+## 12. Acknowledgements
+
+Special thanks to:
+
+- **[xNul (Blake Wyatt)](https://github.com/xNul/palworld-host-save-fix)** — author of the original
+  **palworld-host-save-fix** project that this toolkit is built on. Although the original approach
+  (full decode → JSON → re-encode) no longer works on current Palworld releases — the newer Oodle
+  (`PlM`) save format and the changed guild member layout break the round-trip — it was invaluable as
+  the foundation: the six-slot model, the guild/handle relationships, and the whole idea of a
+  host-save fix all come from that work. This toolkit is essentially that fix re-implemented as a
+  length-preserving binary patch so it survives modern save versions.
+
+- **[cheahjs](https://github.com/cheahjs/palworld-save-tools)** — for `palworld-save-tools`, the GVAS
+  parsing library everything here depends on.
+
+- **Claude (Anthropic)** — for helping diagnose *why* the original tool corrupts current saves
+  (imperfect GVAS round-trip → `Save data is corrupted`), and for designing the workarounds: the
+  length-preserving binary patch, the Oodle/`PlM` decompression support, and the anchor-based slot
+  finder that tolerates the new guild format.
 ```
