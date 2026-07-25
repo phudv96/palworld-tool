@@ -1,0 +1,16 @@
+# Save data cá nhân (nặng, binary) — không version-control
+SaveGames/
+
+# Memory / dữ liệu cá nhân của Claude Code
+.claude/
+
+# Output migrate (sinh ra khi chạy tool)
+PATCHED_*/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Temp
+*.tmp
+*.log
