@@ -508,6 +508,33 @@ class FArchiveReader:
                 "id": _id,
                 "value": values,
             }
+        elif type_name == "SetProperty":
+            # Added for newer Palworld saves (e.g. .worldSaveData.InLockerCharacterInstanceIDArray).
+            # Layout: element_type FString, optional guid, u32 elements-to-remove (0), u32 count,
+            # then `count` elements. StructProperty elements are anonymous structs terminated by "None".
+            set_type = self.fstring()
+            _id = self.optional_guid()
+            self.u32()  # number of elements to remove (delta serialization) - always 0 here
+            count = self.u32()
+            values = []
+            for _ in range(count):
+                if set_type == "StructProperty":
+                    values.append(self.properties_until_end(path))
+                elif set_type == "Guid":
+                    values.append(self.guid())
+                elif set_type in ("NameProperty", "EnumProperty"):
+                    values.append(self.fstring())
+                elif set_type == "IntProperty":
+                    values.append(self.i32())
+                elif set_type == "BoolProperty":
+                    values.append(self.bool())
+                else:
+                    values.append(self.properties_until_end(path))
+            value = {
+                "set_type": set_type,
+                "id": _id,
+                "value": {"values": values},
+            }
         else:
             raise Exception(f"Unknown type: {type_name} ({path})")
         value["type"] = type_name
