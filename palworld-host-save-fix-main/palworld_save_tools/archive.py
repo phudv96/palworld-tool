@@ -509,31 +509,23 @@ class FArchiveReader:
                 "value": values,
             }
         elif type_name == "SetProperty":
-            # Added for newer Palworld saves (e.g. .worldSaveData.InLockerCharacterInstanceIDArray).
-            # Layout: element_type FString, optional guid, u32 elements-to-remove (0), u32 count,
-            # then `count` elements. StructProperty elements are anonymous structs terminated by "None".
+            # Added for newer Palworld saves (e.g. .worldSaveData.InLockerCharacterInstanceIDArray,
+            # and ValidatedStartPointIds inside InvaderDeclarationSaveData). Header is:
+            #   element_type FString, optional guid.
+            # The declared `size` then covers exactly the body:
+            #   [u32 elements-to-remove][u32 count][elements].
+            # Element encodings vary between fields (bare 16-byte Guids vs anonymous multi-field
+            # structs terminated by "None") even though both report element_type "StructProperty",
+            # so we do not decode each element. We honor `size` to consume the body exactly, which
+            # is robust to those variations and to future set fields. The contents are not needed
+            # by the migration tooling (it binary-patches raw bytes, never re-serializes GVAS).
             set_type = self.fstring()
             _id = self.optional_guid()
-            self.u32()  # number of elements to remove (delta serialization) - always 0 here
-            count = self.u32()
-            values = []
-            for _ in range(count):
-                if set_type == "StructProperty":
-                    values.append(self.properties_until_end(path))
-                elif set_type == "Guid":
-                    values.append(self.guid())
-                elif set_type in ("NameProperty", "EnumProperty"):
-                    values.append(self.fstring())
-                elif set_type == "IntProperty":
-                    values.append(self.i32())
-                elif set_type == "BoolProperty":
-                    values.append(self.bool())
-                else:
-                    values.append(self.properties_until_end(path))
+            body = self.data.read(size)
             value = {
                 "set_type": set_type,
                 "id": _id,
-                "value": {"values": values},
+                "value": {"raw_bytes": body},
             }
         else:
             raise Exception(f"Unknown type: {type_name} ({path})")
